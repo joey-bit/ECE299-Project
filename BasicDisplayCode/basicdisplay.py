@@ -19,8 +19,10 @@ spi_res = Pin(16) # res stands for reset; always be connected to SPI RX pin of t
 spi_dc  = Pin(17) # dc stands for data/commonda; always be connected to SPI CSn pin of the Pico
 spi_cs  = Pin(20) # can be connected to any free GPIO pin of the Pico
 
+#Input
+button = Pin(3, Pin.IN, Pin.PULL_DOWN) # Assigning pin 0 to the button input
+
 #Functional Control Variable 
-button = Pin(0, Pin.IN, Pin.PULL_DOWN) # Assigning pin 0 to the button input
 currentState = 0 # initially unpressed
 
 #Constants
@@ -30,12 +32,12 @@ released = 0
 #
 # SPI Device ID can be 0 or 1. It must match the wiring. 
 #
-SPI_DEVICE = 0 # Because the peripheral is connected to SPI 0 hardware lines of the Pico
+SPI_DEVICE_ID = 0 # Because the peripheral is connected to SPI 0 hardware lines of the Pico
 
 #
 # initialize the SPI interface for the OLED display
 #
-oled_spi = SPI( SPI_DEVICE, baudrate= 100000, sck= spi_sck, mosi= spi_sda )
+oled_spi = SPI( SPI_DEVICE_ID, baudrate= 100000, sck= spi_sck, mosi= spi_sda )
 
 #
 # Initialize the display
@@ -56,13 +58,13 @@ while ( True ):
 # Update the text on the screen
 #
         oled.text("Welcome to ECE", 6, 0) # Print the text starting from 0th column and 0th row
-        oled.text("299", 44, 10) # Print the number starting at 45th column and 10th row
-        oled.text("Count is: %4d" % Count, 0, 40 ) # Print the value stored in the variable Count. 
+        oled.text("123", 42, 10) # Print the number starting at 45th column and 10th row
+        oled.text("Count is: %4d" % Count, 8, 40 ) # Print the value stored in the variable Count. 
         
 #
 # Draw box below the text
 #
-        oled.rect( 0, 58, 126, 6, 1  )        
+        oled.rect( 14, 58, 111, 6, 1  )        
 
 #
 # Transfer the buffer to the screen
