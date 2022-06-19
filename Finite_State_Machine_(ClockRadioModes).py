@@ -1,17 +1,11 @@
-#This code will be used to test the OLED display
+#Finite State Machine Code for Clock Radio Modes
 from machine import Pin, SPI, Timer # SPI is a class associated with the machine library. 
 import utime
-#import datetime
 
 # The below specified libraries have to be included. Also, ssd1309.py must be saved on the Pico. 
 from ssd1309 import Display # this is the driver library and the corresponding class
 from xglcd_font import XglcdFont #Fonts
 import framebuf # this is another library for the display. 
-
-# Define columns and rows of the oled display. These numbers are the standard values.
-#Already defined in the ssd1309 library
-#SCREEN_WIDTH = 126 #number of columns #128 for ssd1306, 126 for ssd1309
-#SCREEN_HEIGHT = 64 #number of rows
 
 # Initialize I/O pins associated with the oled display SPI interface
 spi_res = Pin(16) # res stands for reset; always be connected to SPI RX pin of the Pico; this is the MISO
@@ -67,6 +61,23 @@ alarm_time = 0#"08:00"
 
 def toggleTimeFormat(time_val):
     pass
+
+##=============================================================
+##TRANSITIONS
+
+class Transitions(object):
+    def __init__(self, toState):
+        self.toState = toState
+        
+    def Execute(self):
+        print("Transitioning...")
+        
+##=============================================================
+##STATES
+        
+class State(object):
+    def __init__(self,FSM):
+        
 
 while ( True ):
 
