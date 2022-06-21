@@ -166,11 +166,6 @@ class Radio:
         
         return( MuteStatus, VolumeStatus, FrequencyStatus, StereoStatus )
 
-#
-# initialize the FM radio
-#
-fm_radio = Radio( 100.3, 2, False )
-
 while ( True ):
 
 #
