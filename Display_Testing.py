@@ -35,16 +35,22 @@ toggled_up = 0
 toggled_down = 0
 currentState_of_button = 0
 mode_global = "clock" # default display state is clock
-current_frequency = 100.3
-fm_radio = Radio( 100.3, 2, False ) #Initialize radio
+fm_radio = Radio( 101.9, 2, False ) #Initialize radio
+mute = False
+current_frequency = 101.9
+current_volume = 2
 
 #
 #Time Variable
 #
 
 clock_time_12 = 0
+alarm_time_12 = 0
 time_format = 24
-alarm_time = 0#"08:00"
+alarm_hr = 0
+alarm_min = 0
+alarm_sec = 0
+alarm_time = ('{:02d}'.format(alarm_hr) + ":" + '{:02d}'.format(alarm_min))
 #timer init
 
 #Constants
@@ -88,6 +94,9 @@ def switch_mode_global():
     elif mode_global == "snooze":
         mode_global = "clock"
         print("Current mode is clock")
+    elif mode_global == "volume":
+        mode_global = "radio"
+        print("Current mode is radio")
             
 def button_toggle_detect(button_id):
     global currentState_of_button, toggled_snooze, toggled_up, toggled_down, toggled_mode
@@ -104,77 +113,106 @@ def button_toggle_detect(button_id):
                     toggled_up = 1
                 if button_id == button_down:
                     toggled_down = 1
-def set_12_format():
-    global time_hr, time_min, clock_time_12
-    time_hr_12 = time_hr
+                    
+def set_12_format(hr_obj, which):
+    global time_hr, time_min, alarm_hr, alarm_min, clock_time_12, alarm_time_12
+    time_hr_12 = hr_obj
     if time_hr_12 > 12:
-        am_pm = "PM"
+        am_pm = " PM"
         time_hr_12 -=12
     elif time_hr_12 == 12:
-        am_pm = "PM"
+        am_pm = " PM"
     elif time_hr_12 == 0:
         time_hr_12 = 12
-        am_pm = "AM"
+        am_pm = " AM"
     else:
-        am_pm = "AM"
-        
-    clock_time_12 = ('{:02d}'.format(time_hr_12) + ":" + '{:02d}'.format(time_min) + am_pm)
+        am_pm = " AM"
+    if which == "clock": 
+        clock_time_12 = str(('{:02d}'.format(time_hr_12) + ":" + '{:02d}'.format(time_min) + am_pm))
+    if which == "alarm":
+        alarm_time_12 = str(('{:02d}'.format(time_hr_12) + ":" + '{:02d}'.format(alarm_min) + am_pm))
     
-def set_time():
-    global clock_time, time_hr, time_min, toggled_up, toggled_down, toggled_mode
+def set_time_universal(time_string_obj, hr_obj, min_obj, top_text):
+    global toggled_up, toggled_down, toggled_mode, clock_time, alarm_time, time_hr, time_min, alarm_hr, alarm_min
     cursor = "hour"
     display.clear_buffers()
-    display.draw_text( 42, 0, "SET TIME", bally )
-    display.draw_text( 34, 22, clock_time, rototron )
+    if top_text == "SET TIME":
+        display.draw_text( 16, 22, top_text, rototron )
+    if top_text == "SET ALARM":
+        display.draw_text( 2, 22, top_text, rototron )
     display.present()
-    utime.sleep_ms(1000)
+    utime.sleep_ms(1500)
     while (cursor != "exit"):
         button_toggle_detect(button_up)
         button_toggle_detect(button_down)
         button_toggle_detect(button_mode)
         if cursor == "hour":
             if toggled_up:
-                time_hr += 1
+                hr_obj += 1
                 toggled_up = 0
             if toggled_down:
-                time_hr -= 1
+                hr_obj -= 1
                 toggled_down = 0
-            if time_hr > 23:
-                time_hr = 0
-            if time_hr < 0:
-                time_hr = 23
+            if hr_obj > 23:
+                hr_obj = 0
+            if hr_obj < 0:
+                hr_obj = 23
             if toggled_mode:
                 cursor = "min"
                 toggled_mode = 0
             display.clear_buffers()
-            clock_time = ('{:02d}'.format(time_hr) + ":" + '{:02d}'.format(time_min))
-            display.draw_text( 42, 0, "SET HOUR", bally )
-            display.draw_text( 34, 22, clock_time, rototron )
+            time_string_obj = ('{:02d}'.format(hr_obj) + ":" + '{:02d}'.format(min_obj))
+            display.draw_text( 36, 0, "SET HOUR", bally )
+            display.draw_text( 34, 22, time_string_obj, rototron )
             display.present()
         if cursor == "min":
             if toggled_up:
-                time_min += 1
+                min_obj += 1
                 toggled_up = 0
             if toggled_down:
-                time_min -= 1
+                min_obj -= 1
                 toggled_down = 0
-            if time_min > 59:
-                time_hr = 0
-            if time_hr < 0:
-                time_hr = 59
+            if min_obj > 59:
+                min_obj = 0
+            if min_obj < 0:
+                min_obj = 59
             if toggled_mode:
                 cursor = "exit"
                 toggled_mode = 0
             display.clear_buffers()
-            clock_time = ('{:02d}'.format(time_hr) + ":" + '{:02d}'.format(time_min))
-            display.draw_text( 42, 0, "SET MIN", bally )
-            display.draw_text( 34, 22, clock_time, rototron )
-            display.present()   
-             
+            time_str_obj = ('{:02d}'.format(hr_obj) + ":" + '{:02d}'.format(min_obj))
+            display.draw_text( 36, 0, "SET MIN", bally )
+            display.draw_text( 34, 22, time_str_obj, rototron )
+            display.present()
+    if top_text == "SET TIME":
+        clock_time = time_str_obj
+        time_hr = hr_obj
+        time_min = min_obj
+    if top_text == "SET ALARM":
+        alarm_time = time_str_obj
+        alarm_hr = hr_obj
+        alarm_min = min_obj
+        
+def volume_change(up_down):
+    global fm_radio, current_volume
+    
+    if (up_down == "up"):      
+        if ( fm_radio.SetVolume( current_volume + 1)):
+                fm_radio.ProgramRadio()
+                current_volume += 1
+            
+    if (up_down == "down"):      
+        if ( fm_radio.SetVolume( current_volume - 1)):
+                fm_radio.ProgramRadio()
+                current_volume -= 1
+                       
 def run_radio_menu():
-    global current_frequency, radio_configured, fm_radio
+    global current_frequency, radio_configured, fm_radio, display
     exit_status = 0
-    while (exit_status == 0):          
+    display.clear_buffers()
+    while (exit_status == 0):
+        display.draw_text( 26, 22, "CONFIG", rototron )
+        display.present()
     #
     # display the menu
     #  
@@ -196,6 +234,7 @@ def run_radio_menu():
 
             if ( fm_radio.SetFrequency( Frequency ) == True ):
                 fm_radio.ProgramRadio()
+                current_frequency = float(Frequency)
             else:
                 print( "Invalid frequency( Range is 88.0 to 108.0 )" )
     #
@@ -249,68 +288,117 @@ def run_radio_menu():
         else:
             print( "Invalid menu option" )
         
-    Settings = fm_radio.GetSettings()
-    current_frequency = Settings[2]
+   
     
+#initial time set
+
+timeset = False
+#Main Loop    
 while ( True ):
-    #update time
     localtime = utime.localtime()
-    time_hr = localtime[3]
-    time_min = localtime[4]
     time_sec = localtime[5]
-    clock_time = ('{:02d}'.format(time_hr) + ":" + '{:02d}'.format(time_min))
-#
-# Clear the buffer
-#
+    if not timeset:
+        time_hr = localtime[3]
+        time_min = localtime[4]      
+        clock_time = ('{:02d}'.format(time_hr) + ":" + '{:02d}'.format(time_min) + ":" '{:02d}'.format(time_sec))
+    
+    # Clear the buffer
     display.clear_buffers()
-#
-# Update the text on the screen
-#
+
+    # Cycle through system states
     if mode_global == "clock":
-        #display.draw_text8x8(42, 0, "CLOCK")
+        #Check fore time format
         if time_format == 24:
-            display.draw_text( 42, 0, "CLOCK", bally )
-            display.draw_text( 34, 22, clock_time, rototron )
+            display.draw_text( 46, 0, "CLOCK", bally )
+            display.draw_text( 20, 22, clock_time, rototron )
         if time_format == 12:
-            set_12_format()
-            display.draw_text( 42, 0, "CLOCK", bally )
-            display.draw_text( 20, 22, clock_time_12, rototron )
-            
+            set_12_format(time_hr, "clock")
+            display.draw_text( 46, 0, "CLOCK", bally )
+            display.draw_text( 16, 22, clock_time_12, rototron )
+        #Switch time formats    
         if (toggled_up):
             time_format = 24
-            print("24hr format")
+            print("clock - 24hr format")
             toggled_up = 0
         if (toggled_down):
             time_format = 12
-            print("12hr format")
+            print("clock - 12hr format")
             toggled_down = 0
-            
+        #Enter set time function    
         if (toggled_snooze):
-            set_time()
+            set_time_universal(clock_time, time_hr, time_min, "SET TIME")
+            timeset = True
             toggled_snooze = 0
-        #display.draw_text8x8( 0, 0, clock_time[0:11] )
-        #display.draw_text8x8( 0, 12, clock_time[12:] )
-        #display.draw_text8x8( 6, 52, "ALARM: " + str(alarm_time) )
-    if mode_global == "alarm":
-        display.draw_text( 42, 0, "ALARM: " + str(alarm_time), bally )
-        display.draw_text( 34, 22, "00:00", rototron )
-    if mode_global == "radio":
-        if (toggled_snooze):
-            display.clear_buffers()
-            display.draw_text( 42, 0, "RADIO", bally )
-            display.draw_text( 26, 22, "CONFIG", rototron )
-            display.present()
-            run_radio_menu()
-            display.clear_buffers()
-            toggled_snooze = 0
+        clock_time = ('{:02d}'.format(time_hr) + ":" + '{:02d}'.format(time_min) + ":" '{:02d}'.format(time_sec))
+        
+    if mode_global == "alarm":        
+        #Check fore time format
+        if time_format == 24:
+            display.draw_text( 46, 0, "ALARM", bally )
+            display.draw_text( 34, 22, alarm_time, rototron )
+        if time_format == 12:
+            set_12_format(alarm_hr, "alarm")
+            display.draw_text( 46, 0, "ALARM", bally )
+            display.draw_text( 16, 22, alarm_time_12, rototron )
+        #Switch time formats    
         if (toggled_up):
-            volume_up()
+            time_format = 24
+            print("alarm - 24hr format")
             toggled_up = 0
         if (toggled_down):
-            volume_down()
+            time_format = 12
+            print("alarm - 12hr format")
             toggled_down = 0
-        display.draw_text( 42, 0, "RADIO", bally )
+        if (toggled_snooze):
+            set_time_universal(alarm_time, alarm_hr, alarm_min, "SET ALARM")
+            toggled_snooze = 0
+        
+    if mode_global == "radio":
+        
+        if (toggled_snooze):
+            mute = not mute
+            if mute:
+                display.draw_text( 46, 0, "RADIO", bally )
+                display.draw_bitmap("mute_perfect.mono", 46, 22, 24, 24, True, 0)
+                display.present()
+                utime.sleep_ms(750)
+            if not mute:
+                display.draw_text( 46, 0, "RADIO", bally )
+                display.draw_bitmap("unmute_perfect.mono", 46, 22, 24, 24, True, 0)
+                display.present()
+                utime.sleep_ms(750)
+            toggled_snooze = 0
+            
+        if (toggled_up):
+            mode_global = "volume"
+            
+        if (toggled_down):
+            mode_global = "volume"
+            
+        display.clear_buffers()
+        display.draw_text( 46, 0, "RADIO", bally )
         display.draw_text( 22, 22, "%5.1f" % current_frequency + "FM", rototron )
+        
+    if mode_global == "volume":
+        display.clear_buffers()
+        if (toggled_up):
+            volume_change("up")
+            toggled_up = 0
+            
+        if (toggled_down):
+            volume_change("down")
+            toggled_down = 0
+        
+        display.draw_text( 46, 0, "VOLUME", bally )
+        display.draw_bitmap("unmute_perfect.mono", 20, 22, 24, 24, True, 0)
+        display.draw_text( 64, 22, str(current_volume), rototron )
+        display.present()
+        
+        if (toggled_snooze):
+            run_radio_menu()
+            mode_global = "radio"
+            toggled_snooze = 0
+           
     if mode_global == "snooze":
         display.clear_buffers()
         display.draw_text( 26, 22, "SNOOZE", rototron )
@@ -333,8 +421,6 @@ while ( True ):
         switch_mode_global()
         toggled_mode = 0
         
-    if encoder_touched:
-        chnage_volume()
 
                 
                 
