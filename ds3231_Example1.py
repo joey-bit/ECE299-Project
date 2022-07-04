@@ -3,10 +3,12 @@
 
 from machine import Pin
 from machine import SoftI2C 
-from ds3231_port import DS3231
+#from ds3231_port import DS3231
+from DS3231micro import DS3231
 
 i2c = SoftI2C(scl=Pin(13), sda=Pin(12), freq=400000) 
-ds = DS3231(i2c)
+#ds = DS3231(i2c)
+ds = DS3231(13, 12)
 
 
 # The following line of codes can be tested using the REPL:

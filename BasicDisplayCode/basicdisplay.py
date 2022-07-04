@@ -18,8 +18,8 @@ spi_res = Pin(16) # res stands for reset; always be connected to SPI RX pin of t
 spi_dc  = Pin(17) # dc stands for data/commonda; always be connected to SPI CSn pin of the Pico
 spi_cs  = Pin(20) # can be connected to any free GPIO pin of the Pico
 
-i2c_scl = Pin(13, Pin.PULL_UP, mode=Pin.OPEN_DRAIN)
-i2c_sda = Pin(12, Pin.PULL_UP, mode=Pin.OPEN_DRAIN)
+i2c_scl = Pin(13, Pin.PULL_UP, Pin.OPEN_DRAIN)
+i2c_sda = Pin(12, Pin.PULL_UP, Pin.OPEN_DRAIN)
 
 #Input
 button = Pin(0, Pin.IN, Pin.PULL_DOWN) # Assigning pin 0 to the button input
@@ -64,6 +64,7 @@ print('RTC time:   ', utime.localtime())
 """
 #ds3231.set_time(2022, 07, 03, 16, 32, 00, 0, 0)
 ds3231.save_time()  # Set DS3231 from RTC
+ds3231.setAlarm(22, 55)
 
 while ( True ):
 #
@@ -79,11 +80,14 @@ while ( True ):
         timestamp = ds3231.get_time()
         datestring="%04d-%02d-%02d" % (timestamp[0:3])
         timestring="%02d:%02d:%02d" % (timestamp[3:6])
+        alarmtime = ds3231.getAlarm()
+        alarmstring = "%02d:%02d:%02d" % (int(alarmtime[0]), int(alarmtime[1]), int(alarmtime[2]))
         display.draw_text8x8(0, 0, "Testing RTC Module")
-        display.draw_text8x8(40, 9, "Line 1")
+        #display.draw_text8x8(40, 9, "Line 1")
         display.draw_text8x8(0, 26, "Time: %s" % timestring)
-        display.draw_text8x8(0, 35, "Date: %s" % datestring)
-        display.draw_text8x8(80, 55, "Line 2")       
+        display.draw_text8x8(0, 44, "Date: %s" % datestring)
+        display.draw_text8x8(0, 35, "Alarm: %s" % alarmstring)
+        #display.draw_text8x8(80, 55, "Line 2")       
 
 #
 # Transfer the buffer to the screen
