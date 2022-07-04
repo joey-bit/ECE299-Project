@@ -1,19 +1,19 @@
 #This code will be used to test the OLED display
-from machine import Pin, SPI, Timer # SPI is a class associated with the machine library. 
+from machine import Pin, SPI, I2C, Timer # SPI is a class associated with the machine library. 
 import utime
 
-#import datetime
-
-# The below specified libraries have to be included. Also, ssd1309.py must be saved on the Pico. 
-from ssd1309 import Display # this is the driver library and the corresponding class
-from xglcd_font import XglcdFont #Fonts
-import framebuf # this is another library for the display.
+# The below specified libraries have to be included.
+# ssd1309.py and ds3231_port.py must be saved on the Pico. 
+from ssd1309 import Display # OLED driver library and the corresponding class Display
+from ds3231_port import DS3231 # RTC module driver library and the corresponding class DS3231
+from xglcd_font import XglcdFont # Fonts
+import framebuf # Another library for the display.
 from fm_radio import Radio
 
 # Define columns and rows of the oled display. These numbers are the standard values.
-#Already defined in the ssd1309 library
-#SCREEN_WIDTH = 126 #number of columns #128 for ssd1306, 126 for ssd1309
-#SCREEN_HEIGHT = 64 #number of rows
+# Already defined in the ssd1309 library
+# SCREEN_WIDTH = 126 #number of columns #128 for ssd1306, 126 for ssd1309
+# SCREEN_HEIGHT = 64 #number of rows
 
 # Initialize I/O pins associated with the oled display SPI interface
 spi_res = Pin(16) # res stands for reset; always be connected to SPI RX pin of the Pico; this is the MISO
@@ -22,28 +22,33 @@ spi_sck = Pin(18) # sck stands for serial clock; always be connected to SPI SCK 
 spi_sda = Pin(19) # sda stands for serial data;  always be connected to SPI TX pin of the Pico; this is the MOSI
 spi_cs  = Pin(20) # can be connected to any free GPIO pin of the Pico
 
+# Initialize I/O pins associated with the DS3231 RTC Module I2C interface
+i2c_scl = Pin(13, Pin.PULL_UP, Pin.OPEN_DRAIN)
+i2c_sda = Pin(12, Pin.PULL_UP, Pin.OPEN_DRAIN)
+
 # Initialize I/O pins associated with button inputs
 button_snooze = Pin(0, Pin.IN, Pin.PULL_DOWN)
 button_mode = Pin(1, Pin.IN, Pin.PULL_DOWN)
 button_up = Pin(2, Pin.IN, Pin.PULL_DOWN)
 button_down = Pin(3, Pin.IN, Pin.PULL_DOWN)
 
-#State Variable
+# State Variables
 toggled_snooze = 0 # variable defining whether a button was toggled
 toggled_mode = 0
 toggled_up = 0
 toggled_down = 0
 currentState_of_button = 0
-mode_global = "clock" # default display state is clock
+mode_global = "clock" #default display state is clock
+
+# Radio Initializations
 fm_radio = Radio( 101.9, 2, False ) #Initialize radio
 mute = False
 current_frequency = 101.9
 current_volume = 2
 
 #
-#Time Variable
+# Time Variables
 #
-
 clock_time_12 = 0
 alarm_time_12 = 0
 time_format = 24
@@ -53,24 +58,27 @@ alarm_sec = 0
 alarm_time = ('{:02d}'.format(alarm_hr) + ":" + '{:02d}'.format(alarm_min))
 #timer init
 
-#Constants
+# Constants
 pressed = 1
 released = 0
 
 #
-# SPI Device ID can be 0 or 1. It must match the wiring. 
+# SPI and I2C Device IDs can be 0 or 1. It must match the wiring.
 #
-SPI_DEVICE = 0 # Because the peripheral is connected to SPI 0 hardware lines of the Pico
+SPI_DEVICE_ID = 0 # Because the display is connected to SPI 0 hardware lines of the Pico
+I2C_DEVICE_ID = 0 # Because the RTC is connected to I2C 0 hardware lines of the Pico
+I2C_ADDR_RTCM = 104 # Determined by running i2c.scan()
 
 #
-# initialize the SPI interface for the OLED display
+# initialize the SPI interface for the OLED display and I2C interface for RTC Module
 #
-spi = SPI( SPI_DEVICE, baudrate=10000000, sck=spi_sck, mosi=spi_sda )
-
+oled_spi = SPI( SPI_DEVICE_ID, baudrate=10000000, sck=spi_sck, mosi=spi_sda )
+rtcm_i2c = I2C( I2C_DEVICE_ID, scl=i2c_scl, sda=i2c_sda )
 #
 # Initialize the display object
 #
-display = Display( spi, cs=spi_cs, dc=spi_dc, rst=spi_res )
+display = Display( oled_spi, cs=spi_cs, dc=spi_dc, rst=spi_res )
+ds3231 = DS3231(rtcm_i2c)
 
 #
 #Fonts
@@ -188,6 +196,10 @@ def set_time_universal(time_string_obj, hr_obj, min_obj, top_text):
         clock_time = time_str_obj
         time_hr = hr_obj
         time_min = min_obj
+        newTime = list(ds3231.get_time())
+        newTime[3] = time_hr
+        newTime[4] = time_min
+        ds3231.set_time(newTime[0], newTime[1], newTime[2], newTime[3], newTime[4], newTime[5], newTime[6], newTime[7])
     if top_text == "SET ALARM":
         alarm_time = time_str_obj
         alarm_hr = hr_obj
@@ -288,20 +300,19 @@ def run_radio_menu():
         else:
             print( "Invalid menu option" )
         
-   
-    
-#initial time set
 
+#initially time has not been set by user
 timeset = False
+
 #Main Loop    
 while ( True ):
-    localtime = utime.localtime()
-    time_sec = localtime[5]
+    #localtime = utime.localtime()
+    time_sec = ds3231.get_time()[5] #localtime[5]
     if not timeset:
-        time_hr = localtime[3]
-        time_min = localtime[4]      
+        time_hr = ds3231.get_time()[3] #localtime[3]
+        time_min = ds3231.get_time()[4] #localtime[4]      
         clock_time = ('{:02d}'.format(time_hr) + ":" + '{:02d}'.format(time_min) + ":" '{:02d}'.format(time_sec))
-    
+        
     # Clear the buffer
     display.clear_buffers()
 
@@ -310,7 +321,7 @@ while ( True ):
         #Check fore time format
         if time_format == 24:
             display.draw_text( 46, 0, "CLOCK", bally )
-            display.draw_text( 20, 22, clock_time, rototron )
+            display.draw_text( 20, 22, clock_time, rototron )#
         if time_format == 12:
             set_12_format(time_hr, "clock")
             display.draw_text( 46, 0, "CLOCK", bally )
@@ -332,7 +343,7 @@ while ( True ):
         clock_time = ('{:02d}'.format(time_hr) + ":" + '{:02d}'.format(time_min) + ":" '{:02d}'.format(time_sec))
         
     if mode_global == "alarm":        
-        #Check fore time format
+        #Check for time format
         if time_format == 24:
             display.draw_text( 46, 0, "ALARM", bally )
             display.draw_text( 34, 22, alarm_time, rototron )
