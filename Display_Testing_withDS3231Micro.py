@@ -1,6 +1,7 @@
 #This code will be used to test the OLED display
 from machine import Pin, SPI, I2C, Timer # SPI is a class associated with the machine library. 
 import utime
+import time
 
 # The below specified libraries have to be included.
 # ssd1309.py and ds3231_port.py must be saved on the Pico. 
@@ -80,6 +81,23 @@ alarm_hr = ds3231.getAlarm1()[1] #hours #0
 alarm_min = ds3231.getAlarm1()[2] #minutes #0
 alarm_sec = ds3231.getAlarm1()[3] #seconds #0
 alarm_time = ('{:02d}'.format(alarm_hr) + ":" + '{:02d}'.format(alarm_min))
+#alarm_time_full = ('{:02d}'.format(alarm_hr) + ":" + '{:02d}'.format(alarm_min) + ":" + '{:02d}'.format(alarm_sec))
+
+#
+# Alarm Sounds
+#
+#Dictionary of notes and their corresponding frequencies
+note_freq = {
+    "C4":262,
+    "D4":294,
+    "E4":330,
+    "R":1 # rest note, any value > 0 will work here
+    }
+
+#Each list item is a note and its duration
+alarm_theme = [["C4", 0.2], ["D4", 0.2], ["E4", 0.2], ["R", 0.5]]
+
+speaker = machine.PWM(machine.Pin(21))
 
 #
 #Fonts
@@ -106,6 +124,9 @@ def switch_mode_global():
     elif mode_global == "volume":
         mode_global = "radio"
         print("Current mode is radio")
+    elif mode_global == "ringing alarm":
+        mode_global = "clock"
+        print("Current mode is clock")
             
 def button_toggle_detect(button_id):
     global currentState_of_button, toggled_snooze, toggled_up, toggled_down, toggled_mode
@@ -299,11 +320,35 @@ def run_radio_menu():
             exit_status = 1
         else:
             print( "Invalid menu option" )
-        
+
+#Function for creating alarm sounds using PWM
+def play_note(note_name, duration):
+    if note_name == "R":
+        speaker.duty_u16(0)
+        time.sleep(duration)
+    else:
+        speaker.duty_u16(int(65535/2))#set duty cycle of the PWM
+        frequency = note_freq[note_name]
+        speaker.freq(frequency)#send freq to Pin
+        time.sleep(duration)
+        speaker.duty_u16(0)#stop the PWM
+       
+def ring_alarm():
+    #Mute Radio
+    Mute = 1
+    if ( fm_radio.SetMute( Mute ) == True ):
+        fm_radio.ProgramRadio()
+    #Replay alarm sound pattern
+    for note in alarm_theme:
+        play_note(note[0], note[1])
+    #Unmute Radio
+    Mute = 0
+    if ( fm_radio.SetMute( Mute ) == True ):
+        fm_radio.ProgramRadio()
 
 #initially time has not been set by user
 timeset = False
-
+alarm_shut = False
 #Main Loop    
 while ( True ):
     #localtime = utime.localtime()
@@ -312,6 +357,10 @@ while ( True ):
         time_hr = ds3231.getHour() #localtime[3]
         time_min = ds3231.getMinutes() #localtime[4]      
         clock_time = ('{:02d}'.format(time_hr) + ":" + '{:02d}'.format(time_min) + ":" '{:02d}'.format(time_sec))
+    
+    alarm_time_full = alarm_time + ":" + '{:02d}'.format(alarm_sec)
+    if clock_time == alarm_time_full: #check if clock hours, mins and secs match alarm
+        mode_global = "ringing alarm"
         
     # Clear the buffer
     display.clear_buffers()
@@ -410,23 +459,45 @@ while ( True ):
             mode_global = "radio"
             toggled_snooze = 0
            
-    if mode_global == "snooze":
+    if mode_global == "ringing alarm":
         display.clear_buffers()
-        display.draw_text( 26, 22, "SNOOZE", rototron )
-
+        display.draw_text( 28, 22, "WAKE UP", rototron )
+        ring_alarm()
+        if (toggled_snooze):
+            mode_global = "snooze"
+            toggled_snooze = 0
+        if (toggled_mode):
+            mode_global = "clock"
+            toggled_mode = 0
+    
+    if mode_global == "snooze":
+        Mute = 1
+        if ( fm_radio.SetMute( Mute ) == True ):
+            fm_radio.ProgramRadio()
+        snooze_time = 10
+        while snooze_time > 0:
+            display.clear_buffers()
+            display.draw_text( 0, 0, "Snooze Time Remaining", bally )
+            display.draw_text( 36, 22, str(snooze_time), rototron )
+            utime.sleep(1)
+            snooze_time -= 1
+            display.present()
+        mode_global = "ringing alarm"
+        
 #
 # Transfer the buffer to the screen
 #
     display.present()
     
 #
-# Update displayed number
+# Detect buttons presses
 #
     button_toggle_detect(button_snooze)
     button_toggle_detect(button_mode)
     button_toggle_detect(button_down)
     button_toggle_detect(button_up)
     
+    #switch modes when mode button is clicked
     if toggled_mode == 1:
         print("MODE")
         switch_mode_global()
