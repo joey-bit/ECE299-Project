@@ -2,6 +2,7 @@
 from machine import Pin, SPI, I2C, Timer # SPI is a class associated with the machine library. 
 import utime
 import time
+import gui_io
 
 # The below specified libraries have to be included.
 # ssd1309.py and ds3231_port.py must be saved on the Pico. 
@@ -33,6 +34,14 @@ button_snooze = Pin(0, Pin.IN, Pin.PULL_DOWN)
 button_mode = Pin(1, Pin.IN, Pin.PULL_DOWN)
 button_up = Pin(2, Pin.IN, Pin.PULL_DOWN)
 button_down = Pin(3, Pin.IN, Pin.PULL_DOWN)
+
+
+# Initialize I/O pins associated with LEDs
+red_led = Pin( 21, Pin.OUT, Pin.PULL_DOWN )
+green_led = Pin( 22, Pin.OUT, Pin.PULL_DOWN )
+
+encoderA = Pin( 14, Pin.IN, Pin.PULL_UP )
+encoderB = Pin( 15, Pin.IN, Pin.PULL_UP )
 
 # State Variables
 toggled_snooze = 0 # variable defining whether a button was toggled
@@ -95,9 +104,9 @@ note_freq = {
     }
 
 #Each list item is a note and its duration
-alarm_theme = [["C4", 0.2], ["D4", 0.2], ["E4", 0.2], ["R", 0.5]]
+alarm_theme = [["C4", 0.2], ["D4", 0.2], ["E4", 0.2], ["R", 0.4]]
 
-speaker = machine.PWM(machine.Pin(21))
+speaker = machine.PWM(machine.Pin(8))
 
 #
 #Fonts
@@ -238,89 +247,7 @@ def volume_change(up_down):
         if ( fm_radio.SetVolume( current_volume - 1)):
                 fm_radio.ProgramRadio()
                 current_volume -= 1
-                       
-def run_radio_menu():
-    global current_frequency, radio_configured, fm_radio, display
-    exit_status = 0
-    display.clear_buffers()
-    while (exit_status == 0):
-        display.draw_text( 26, 22, "CONFIG", rototron )
-        display.present()
-    #
-    # display the menu
-    #  
-        print("")
-        print( "ECE 299 FM Radio Demo Menu" );
-        print("")
-        print( "1 - change radio frequency" )
-        print( "2 - change volume level" )
-        print( "3 - mute audio" )
-        print( "4 - read current settings" )
-        print( "5 - exit configuration menu")
-        
-        select = input( "Enter menu number > " )
-    #
-    # Set radio frequency
-    #
-        if ( select == "1" ):
-            Frequency = input( "Enter frequncy in Mhz ( IE 100.3 ) > " )
-
-            if ( fm_radio.SetFrequency( Frequency ) == True ):
-                fm_radio.ProgramRadio()
-                current_frequency = float(Frequency)
-            else:
-                print( "Invalid frequency( Range is 88.0 to 108.0 )" )
-    #
-    # Set volume level of radio
-    #
-        elif ( select == "2" ):
-            Volume = input( "Enter volume level ( 0 to 15, 15 is loud ) > " )
-            
-            if ( fm_radio.SetVolume( Volume ) == True ):
-                fm_radio.ProgramRadio()
-            else:
-                print( "Invalid volume level( Range is 0 to 15 )" )        
-    #        
-    # Enable mute of radio       
-    #        
-        elif( select == "3" ):
-            Mute = input( "Enter mute ( 1 for Mute, 0 for audio ) > " )
-            
-            if ( fm_radio.SetMute( Mute ) == True ):
-                fm_radio.ProgramRadio()
-            else:
-                print( "Invalid mute setting" )
-    #
-    # Display radio current settings
-    #
-        elif( select == "4" ):
-            Settings = fm_radio.GetSettings()
-
-            print( Settings )
-            print("")
-            print("Radio Status")
-            print("")
-
-            print( "Mute: ", end="" )
-            if ( Settings[0] == True ):
-                print( "enabled" )
-            else:
-                print( "disabled" )
-
-            print( "Volume: %d" % Settings[1] )
-
-            print( "Frequency: %5.1f" % Settings[2] )
-
-            print( "Mode: ", end="" )
-            if ( Settings[3] == True ):
-                print( "stereo" )
-            else:
-                print( "mono" )
-        elif( select == "5" ):
-            exit_status = 1
-        else:
-            print( "Invalid menu option" )
-
+                
 #Function for creating alarm sounds using PWM
 def play_note(note_name, duration):
     if note_name == "R":
@@ -332,24 +259,51 @@ def play_note(note_name, duration):
         speaker.freq(frequency)#send freq to Pin
         time.sleep(duration)
         speaker.duty_u16(0)#stop the PWM
-       
-def ring_alarm():
-    #Mute Radio
-    Mute = 1
-    if ( fm_radio.SetMute( Mute ) == True ):
-        fm_radio.ProgramRadio()
-    #Replay alarm sound pattern
-    for note in alarm_theme:
-        play_note(note[0], note[1])
-    #Unmute Radio
-    Mute = 0
-    if ( fm_radio.SetMute( Mute ) == True ):
-        fm_radio.ProgramRadio()
+        
+def program_frequency():
+    encoderA = Pin( 14, Pin.IN, Pin.PULL_UP )
+    encoderB = Pin( 15, Pin.IN, Pin.PULL_UP )
+    val_changed = False
+    button_encoder = Pin(11, Pin.IN, Pin.PULL_UP)
+    toggled_encoder = 0
+    global current_frequency, display
+    
+    while toggled_encoder == 0:
+        if val_changed == True:
+            if encoderA.value()==1 and encoderB.value()==1:
+                val_changed = False
+        if val_changed == False:
+            if encoderA.value() == 0:
+                if encoderB.value()==1:
+                    current_frequency-=0.1
+                    val_changed = True
+                if val_changed == False:
+                    current_frequency +=0.1
+                    val_changed = True
+                        
+        display.clear_buffers()
+        display.draw_text( 16, 0, "SET FREQUENCY", bally )
+        display.draw_text( 22, 22, "%5.1f" % current_frequency + "FM", rototron )
+        display.present()
+        
+        if button_encoder.value() == 0:
+            currentState_of_button = pressed
+            while currentState_of_button == pressed:
+                if button_encoder.value() == 1:
+                    currentState_of_button = released
+                    toggled_encoder = 1
+                    
+        
+    fm_radio.SetFrequency(current_frequency)
+    fm_radio.ProgramRadio()
+    toggled_encoder = 0
 
 #initially time has not been set by user
 timeset = False
 alarm_shut = False
-#Main Loop    
+red_led.value(1)
+green_led.value(1)
+#Main Loop
 while ( True ):
     #localtime = utime.localtime()
     time_sec = ds3231.getSeconds() #localtime[5]
@@ -435,6 +389,11 @@ while ( True ):
         if (toggled_down):
             mode_global = "volume"
             
+        if encoderA.value() == 0:
+            program_frequency()
+        
+        
+                        
         display.clear_buffers()
         display.draw_text( 46, 0, "RADIO", bally )
         display.draw_text( 22, 22, "%5.1f" % current_frequency + "FM", rototron )
@@ -462,20 +421,26 @@ while ( True ):
     if mode_global == "ringing alarm":
         display.clear_buffers()
         display.draw_text( 28, 22, "WAKE UP", rototron )
-        ring_alarm()
-        if (toggled_snooze):
-            mode_global = "snooze"
-            toggled_snooze = 0
-        if (toggled_mode):
-            mode_global = "clock"
-            toggled_mode = 0
+        fm_radio.SetMute( 1 )
+        fm_radio.ProgramRadio()
+        #Replay alarm sound pattern
+        for note in alarm_theme:
+            play_note(note[0], note[1])
+            if (toggled_snooze):
+                mode_global = "snooze"
+                toggled_snooze = 0
+                break
+            if (toggled_mode):
+                mode_global = "clock"
+                toggled_mode = 0
+                break
     
     if mode_global == "snooze":
         Mute = 1
         if ( fm_radio.SetMute( Mute ) == True ):
             fm_radio.ProgramRadio()
         snooze_time = 10
-        while snooze_time > 0:
+        while snooze_time >= 0:
             display.clear_buffers()
             display.draw_text( 0, 0, "Snooze Time Remaining", bally )
             display.draw_text( 36, 22, str(snooze_time), rototron )
@@ -483,6 +448,7 @@ while ( True ):
             snooze_time -= 1
             display.present()
         mode_global = "ringing alarm"
+            
         
 #
 # Transfer the buffer to the screen
@@ -502,6 +468,7 @@ while ( True ):
         print("MODE")
         switch_mode_global()
         toggled_mode = 0
+        
         
 
                 
